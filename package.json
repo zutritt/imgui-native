@@ -1,0 +1,17 @@
+{
+  "name": "imgui",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "cmake-js build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "node-addon-api": "^8.6.0",
+    "cmake-js": "^8.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

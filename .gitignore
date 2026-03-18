@@ -1,0 +1,41 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+coverage
+*.lcov
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# Env
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Editor configs
+.vscode
+.idea
+
+# Cmake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CMakeUserPresets.json
+CTestTestfile.cmake
+_deps
+build
