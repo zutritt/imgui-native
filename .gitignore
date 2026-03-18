@@ -40,3 +40,7 @@ CMakeUserPresets.json
 CTestTestfile.cmake
 _deps
 build
+
+# Generated files
+lib/gen
+!lib/gen/.gitkeep

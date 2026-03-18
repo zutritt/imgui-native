@@ -42,7 +42,24 @@ string(REPLACE "\"" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/gen")
+file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/gen/bindings")
+set(DEAR_BINDINGS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/lib/gen/bindings")
+
+execute_process(
+  COMMAND ${Python3_EXECUTABLE}
+    "${CMAKE_SOURCE_DIR}/deps/dear_bindings/dear_bindings.py"
+    -o "${DEAR_BINDINGS_OUTPUT_DIR}/dcimgui"
+    "${CMAKE_SOURCE_DIR}/deps/imgui/imgui.h"
+  RESULT_VARIABLE DEAR_BINDINGS_RESULT
+  OUTPUT_VARIABLE DEAR_BINDINGS_OUTPUT
+  ERROR_VARIABLE DEAR_BINDINGS_ERROR
+)
+
+if(NOT DEAR_BINDINGS_RESULT EQUAL 0)
+  message(FATAL_ERROR "Dear Bindings generation failed:\n${DEAR_BINDINGS_ERROR}")
+endif()
+
+message(STATUS "Dear Bindings generated successfully")
 
 add_custom_target(generate_cpp ALL
   COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/gen/main.py"
@@ -64,7 +81,7 @@ target_include_directories(imgui_lib PUBLIC
 
 set(DEAR_BINDINGS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/deps/dear_bindings/src)
 
-file(GLOB_RECURSE SOURCE_FILES "lib/*")
+file(GLOB_RECURSE SOURCE_FILES "lib/*.cpp" "lib/*.h" "lib/gen/*.cpp" "lib/gen/*.h")
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
@@ -74,10 +91,17 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_JS_INC}
   ${NODE_ADDON_API_DIR}
   ${DEAR_BINDINGS_INCLUDE_DIR}
+  "${DEAR_BINDINGS_OUTPUT_DIR}"
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} imgui_lib)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+
+set_source_files_properties(
+  "${DEAR_BINDINGS_OUTPUT_DIR}/dcimgui.cpp"
+  "${DEAR_BINDINGS_OUTPUT_DIR}/dcimgui.h"
+  PROPERTIES GENERATED TRUE
+)
 
 add_dependencies(${PROJECT_NAME} generate_cpp)
 
