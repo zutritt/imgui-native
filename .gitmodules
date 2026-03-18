@@ -1,0 +1,7 @@
+[submodule "deps/imgui"]
+	path = deps/imgui
+	url = https://github.com/ocornut/imgui
+	branch = docking
+[submodule "deps/dear_bindings"]
+	path = deps/dear_bindings
+	url = https://github.com/dearimgui/dear_bindings
