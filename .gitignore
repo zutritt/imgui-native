@@ -44,3 +44,7 @@ build
 # Generated files
 lib/gen/*
 !lib/gen/.gitkeep
+
+# python
+__pycache__
+*.pyc
