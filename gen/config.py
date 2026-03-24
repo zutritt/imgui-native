@@ -16,3 +16,39 @@ NEEDS_CPP_CONSTRUCTOR = {
 OWNED_RETURNS = {
     'ImDrawList_CloneOutput': 'IM_DELETE',
 }
+
+BORROW_ONLY = {
+    'ImGuiIO',
+    'ImGuiStyle',
+    'ImDrawList',
+    'ImFont',
+    'ImFontAtlas',
+    'ImGuiViewport',
+    'ImDrawData',
+    'ImGuiPlatformIO',
+    'ImGuiMultiSelectIO',
+    'ImDrawCmd',
+    'ImDrawVert',
+    'ImGuiKeyData',
+    'ImGuiStoragePair',
+    'ImGuiTableColumnSortSpecs',
+    'ImGuiTableSortSpecs',
+    'ImGuiPayload',
+    'ImGuiInputEvent',
+    'ImGuiPlatformMonitor',
+    'ImGuiPlatformImeData',
+    'ImGuiSelectionExternalStorage',
+    'ImTextureData',
+    'ImDrawCmdHeader',
+    'ImDrawChannel',
+    'ImDrawListSplitter',
+    'ImFontGlyph',
+    'ImFontAtlasRect',
+    'ImFontBaked',
+    'ImGuiSizeCallbackData',
+    'ImGuiInputTextCallbackData',
+    'ImGuiSelectionRequest',
+    'ImTextureRect',
+}
+
+SKIP_STRUCTS = {'__anonymous_type0', '__anonymous_type1', 'ImGuiTextFilter_ImGuiTextRange'}

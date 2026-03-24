@@ -2,6 +2,24 @@ from core.text import indent
 from core.text import lines
 
 
+class DtsClass:
+    def __init__(self, name: str):
+        self._name = name
+        self._members: list[str] = []
+
+    def member(self, text: str):
+        self._members.append(text)
+        return self
+
+    def blank(self):
+        self._members.append('')
+        return self
+
+    def render(self) -> str:
+        body = indent(lines(self._members))
+        return f'export class {self._name} {{\n{body}\n}}'
+
+
 class DtsFile:
     def __init__(self):
         self._blocks: list[str] = []

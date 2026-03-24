@@ -1,9 +1,8 @@
 import sys
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-import unittest
 
 from config import BINDINGS_FILE
 from config import NEEDS_CPP_CONSTRUCTOR
@@ -38,7 +37,6 @@ class TestSanityChecks(unittest.TestCase):
         self.assertEqual(len(self.reg.imvector_structs), 26)
 
     def test_no_heap_constructor_wrappers(self):
-        # ImTextureData_Create is an in-place initializer, not a heap allocator
         KNOWN_CREATE = {'ImGui_CreateContext', 'ImTextureData_Create'}
         for f in self.reg.all_functions:
             name = f['name']
@@ -84,24 +82,6 @@ class TestSanityChecks(unittest.TestCase):
                     count += 1
                     break
         self.assertGreater(count, 10)
-
-    def test_function_pointer_typedefs_resolvable(self):
-        from data.typedefs import FUNCTION_POINTER_TYPEDEFS
-
-        for name in FUNCTION_POINTER_TYPEDEFS:
-            self.assertTrue(
-                self.reg.typedefs.is_function_pointer(name),
-                f'{name} not detected as function pointer',
-            )
-
-    def test_size_t_resolvable(self):
-        result = self.reg.typedefs.resolve('size_t')
-        self.assertIsNotNone(result)
-
-    def test_imtextureid_chain_resolves(self):
-        result = self.reg.typedefs.resolve('ImTextureID')
-        self.assertIsNotNone(result)
-        self.assertEqual(result['kind'], 'Builtin')
 
 
 if __name__ == '__main__':

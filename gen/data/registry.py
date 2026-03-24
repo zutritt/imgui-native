@@ -15,6 +15,7 @@ class Registry:
         self._classify_functions()
         self._build_enum_counts()
         self._build_helper_index()
+        self._build_owned_structs()
 
     def _classify_structs(self):
         self.by_value_structs = []
@@ -56,11 +57,23 @@ class Registry:
         for enum in self.enums:
             for el in enum['elements']:
                 if el.get('is_count'):
-                    name = el['name']
-                    self.enum_counts[name] = el['value']
+                    self.enum_counts[el['name']] = el['value']
 
     def _build_helper_index(self):
         self.helper_names = {f['name'] for f in self.helpers}
+
+    def _build_owned_structs(self):
+        from config import OWNED_RETURNS
+
+        fn_map = {f['name']: f for f in self.all_functions}
+        self.owned_structs = {}
+        for fn_name, delete_method in OWNED_RETURNS.items():
+            fn = fn_map.get(fn_name)
+            if not fn:
+                continue
+            ret = fn['return_type']['description']
+            if ret['kind'] == 'Pointer' and ret['inner_type']['kind'] == 'User':
+                self.owned_structs[ret['inner_type']['name']] = delete_method
 
     def has_helper(self, func_name: str) -> bool:
         if not func_name.endswith('Ex'):
