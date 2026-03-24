@@ -48,3 +48,5 @@ lib/gen/*
 # python
 __pycache__
 *.pyc
+gen/.venv
+gen/uv.lock
