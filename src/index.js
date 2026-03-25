@@ -6,13 +6,13 @@ import { existsSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 
 function getBinaryPath() {
-  const localBuild = join(import.meta.dirname, 'build', 'Release', 'imgui.node');
+  const localBuild = join(import.meta.dirname, '..', 'build', 'Release', 'imgui.node');
 
   if (existsSync(localBuild)) {
     return localBuild;
   }
 
-  const prebuild = join(import.meta.dirname, 'prebuild', `${platform}-${arch}`, 'imgui.node');
+  const prebuild = join(import.meta.dirname, '..', 'prebuild', `${platform}-${arch}`, 'imgui.node');
 
   if (existsSync(prebuild)) {
     return prebuild;
