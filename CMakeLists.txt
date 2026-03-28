@@ -81,7 +81,7 @@ target_include_directories(imgui_lib PUBLIC
 
 set(DEAR_BINDINGS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/deps/dear_bindings/src)
 
-file(GLOB_RECURSE SOURCE_FILES "lib/*.cpp" "lib/*.h" "lib/gen/*.cpp" "lib/gen/*.h")
+file(GLOB_RECURSE SOURCE_FILES "lib/*.cpp" "lib/*.h" "lib/gen/*.cpp" "lib/gen/*.h" "lib/gen/napi/*.cpp" "lib/gen/napi/*.h")
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
@@ -92,6 +92,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${NODE_ADDON_API_DIR}
   ${DEAR_BINDINGS_INCLUDE_DIR}
   "${DEAR_BINDINGS_OUTPUT_DIR}"
+  "${CMAKE_SOURCE_DIR}/lib/gen/napi"
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} imgui_lib)

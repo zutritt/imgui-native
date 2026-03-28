@@ -7,7 +7,9 @@ from config import BINDINGS_FILE
 from config import GEN_DTS
 from config import GEN_NAPI
 from processor.enum import process_enums
+from processor.struct_ import process_structs
 from processor.typedef import process_typedefs
+from processor.function_ import process_functions
 
 
 def clean_dir(path: Path):
@@ -38,7 +40,9 @@ def main():
     print("File loaded, generating bindings")
 
     process_enums(bindings)
+    process_structs(bindings)
     process_typedefs(bindings)
+    process_functions(bindings)
 
     print("All done")
 
