@@ -25,6 +25,7 @@ def process_enums(bindings):
     """
 
     generated_enums = {}
+    enum_names = {}
 
     enums = bindings["enums"]
     for enum in enums:
@@ -59,6 +60,8 @@ def process_enums(bindings):
 
             generated_entries[simplified_element_name] = element_value
 
+        raw_name = name
+
         if name.startswith("ImGui"):
             name = name.removeprefix("ImGui")
         elif name.startswith("Im"):
@@ -68,6 +71,7 @@ def process_enums(bindings):
         name = name.removeprefix("_")
 
         generated_enums[name] = generated_entries
+        enum_names[raw_name] = name
 
     lines = []
 
@@ -101,3 +105,5 @@ def process_enums(bindings):
 
     dts_file = GEN_DTS / "enums.d.ts"
     dts_file.write_text(enum_dts)
+
+    return enum_names

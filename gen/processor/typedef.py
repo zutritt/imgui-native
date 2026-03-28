@@ -21,28 +21,33 @@ BUILTIN_TYPE_TO_TS_TYPE = {
     "unsigned_long_long": "bigint",
 }
 
-def process_typedefs(bindings):
+def process_typedefs(bindings, processed_enums):
     """
         Process typedefs from the bindings and generate DTS files.
         Typedefs are additional named types, so they don't need any napi code,
         but thet will be preserved in DTS for better readability.
     """
 
-    ultimate_builtin_types = {}
-
     typedefs = bindings["typedefs"]
     typedefs_by_name = { t["name"]: t for t in typedefs }
 
     type_declarations = {}
 
-    def declare_type(name: str, ts_type: str, comment: str | None = None):
+    def declare_type(name: str, ts_type: str, builtin_type: str, comment: str | None = None):
         if name in type_declarations:
             current_ts_type = type_declarations[name].ts_type
             print(f"Duplicate typedef {name=}, investigate: {current_ts_type} {ts_type=}")
 
+        renamed = name
+        if renamed.startswith("ImGui"):
+            renamed = renamed.removeprefix("ImGui")
+        elif renamed.startswith("Im"):
+            renamed = renamed.removeprefix("Im")
+
         type_declarations[name] = {
-            "name": name,
+            "name": renamed,
             "ts_type": ts_type,
+            "builtin_type": builtin_type,
             "comment": comment
         }
 
@@ -68,8 +73,7 @@ def process_typedefs(bindings):
                 print(f"Cannot map {name=} {builtin_type=} to ts type")
                 continue
 
-            declare_type(name, ts_type)
-            ultimate_builtin_types[name] = builtin_type
+            declare_type(name, ts_type, builtin_type)
 
         elif type_kind == "User":
             # This typedef resolves to another typedef, function pointer or struct
@@ -78,7 +82,12 @@ def process_typedefs(bindings):
             if target_name not in typedefs_by_name:
                 # TODO: remove short circuit, for now we just generate is a unknown ts type
                 # This is because some downstream types might depend on this one
-                declare_type(name, "unknown", "Struct or enum or other user defined type")
+                declare_type(
+                    name,
+                    "unknown",
+                    "<unknown>",
+                    "Struct or enum or other user defined type"
+                )
                 continue
 
                 # This does not point to antother typedef, perhaps its a struct
@@ -87,8 +96,8 @@ def process_typedefs(bindings):
                 print(f"Unknown typedef target {name=} {type_kind=} {target_name=}")
                 continue
             else:
-                declare_type(name, target_name)
-                ultimate_builtin_types[name] = ultimate_builtin_types[target_name]
+                renamed = type_declarations[target_name]["name"]
+                declare_type(name, renamed, type_declarations[target_name]["builtin_type"])
 
             # Now we know we know that resulting type will be just an alias to another one
         elif type_kind == "Type":
@@ -105,8 +114,11 @@ def process_typedefs(bindings):
 
                 # TODO process function
 
-                declare_type(name, "CallbackRef<(...args: unknown[]) => unknown>",
-                             "Function pointer not supported yet")
+                declare_type(
+                    name,
+                    "CallbackRef<(...args: unknown[]) => unknown>",
+                    "<unknown>",
+                    "Function pointer not supported yet")
                 continue
 
             else:
@@ -117,17 +129,26 @@ def process_typedefs(bindings):
             print(f"Unknown typedef type for {name}: {type_kind}")
             continue
 
-
     lines = []
     for name, info in type_declarations.items():
+        if name in processed_enums or f'{name}_' in processed_enums:
+            # ImGui defines enums, but uses _ after the name, and then defines name without
+            # underscore as a typedef of integer - this gives a type hint to programmer
+            # but we don't have to replicate that behaviour, so we are skipping typedefs
+            # that point to enums. We still want to have ultimate resoltuion table
+            # for those types, so this filtering step is performed here
+            continue
+
+        renamed = info["name"]
+
         if "comment" in info and info["comment"] is not None:
-            lines.append(f"type {name} = {info["ts_type"]}; // {info["comment"]}")
+            lines.append(f"type {renamed} = {info["ts_type"]}; // {info["comment"]}")
         else:
-            lines.append(f"type {name} = {info["ts_type"]};")
+            lines.append(f"type {renamed} = {info["ts_type"]};")
 
     enum_dts = "\n".join(lines)
 
     dts_file = GEN_DTS / "typedefs.d.ts"
     dts_file.write_text(enum_dts)
 
-    return ultimate_builtin_types
+    return type_declarations

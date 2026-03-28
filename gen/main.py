@@ -37,8 +37,8 @@ def main():
 
     print("File loaded, generating bindings")
 
-    process_enums(bindings)
-    process_typedefs(bindings)
+    processed_enums = process_enums(bindings)
+    _processed_typedefs = process_typedefs(bindings, processed_enums)
 
     print("All done")
 
