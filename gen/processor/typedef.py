@@ -28,6 +28,8 @@ def process_typedefs(bindings):
         but thet will be preserved in DTS for better readability.
     """
 
+    ultimate_builtin_types = {}
+
     typedefs = bindings["typedefs"]
     typedefs_by_name = { t["name"]: t for t in typedefs }
 
@@ -67,6 +69,7 @@ def process_typedefs(bindings):
                 continue
 
             declare_type(name, ts_type)
+            ultimate_builtin_types[name] = builtin_type
 
         elif type_kind == "User":
             # This typedef resolves to another typedef, function pointer or struct
@@ -85,6 +88,7 @@ def process_typedefs(bindings):
                 continue
             else:
                 declare_type(name, target_name)
+                ultimate_builtin_types[name] = ultimate_builtin_types[target_name]
 
             # Now we know we know that resulting type will be just an alias to another one
         elif type_kind == "Type":
@@ -125,3 +129,5 @@ def process_typedefs(bindings):
 
     dts_file = GEN_DTS / "typedefs.d.ts"
     dts_file.write_text(enum_dts)
+
+    return ultimate_builtin_types
