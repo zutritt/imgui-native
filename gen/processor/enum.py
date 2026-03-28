@@ -1,93 +1,103 @@
+from config import GEN_DTS
 from config import GEN_NAPI
 
-# Enums to exclude from generation (internal or not needed)
-EXCLUDED_ENUMS = [
-    # Add enum names here if they should be skipped
-]
+ENUMS_CPP_FORMAT= """
+#include <napi.h>
+
+void InitEnums(Napi::Env env, Napi::Object exports)
+{
+  Napi::Object enums = Napi::Object::New(env);
+  Napi::Function freeze = env
+    .Global()
+    .Get("Object")
+    .As<Napi::Object>()
+    .Get("freeze")
+    .As<Napi::Function>();
+
+  {enums}
+}
+"""
+
 
 def process_enums(bindings):
     """
-    Generate enum types and NAPI C++ bindings for constants defined in the bindings file.
+        Process typedefs from the bindings and generate DTS files and C++ napi code.
     """
-    
-    enums_from_bindings = bindings.get("enums", [])
-    
-    generated_enum_blocks = []
-    
-    for enum_entry in enums_from_bindings:
-        enum_name = enum_entry["name"]
-        
-        if enum_name in EXCLUDED_ENUMS:
-            print(f"Skipping excluded enum: {enum_name}")
-            continue
-        
-        if enum_entry.get("is_internal", False):
-            print(f"Skipping internal enum: {enum_name}")
-            continue
-        
-        stripped_enum_name = enum_name.rstrip("_")
-        
-        elements = enum_entry.get("elements", [])
-        
-        element_lines = []
-        for element in elements:
-            element_name = element["name"]
-            element_value = element["value"]
-            
-            prefix_to_strip = enum_name + "_"
-            if element_name.startswith(prefix_to_strip):
-                stripped_element_name = element_name[len(prefix_to_strip):]
-            else:
-                stripped_element_name = element_name
-            
-            cpp_line = f'  _{stripped_enum_name}.Set("{stripped_element_name}", Napi::Number::New(env, {element_value}));'
-            element_lines.append(cpp_line)
-        
-        generated_enum_blocks.append((stripped_enum_name, element_lines))
-    
-    # Build the C++ code for enums.cpp
-    cpp_code_lines = [
-        "// AUTO-GENERATED - DO NOT EDIT",
-        "#include <napi.h>",
-        "#include \"enums.h\"",
-        "",
-        "void InitEnums(Napi::Env env, Napi::Object exports)",
-        "{",
-        "  Napi::Object enums = Napi::Object::New(env);",
-        '  Napi::Function freeze = env.Global().Get("Object").As<Napi::Object>().Get("freeze").As<Napi::Function>();',
-        ""
-    ]
-    
-    for enum_name, lines in generated_enum_blocks:
-        cpp_code_lines.append(f"  Napi::Object _{enum_name} = Napi::Object::New(env);")
-        cpp_code_lines.extend(lines)
-        cpp_code_lines.append(f"  freeze.Call({{_{enum_name}}});")
-        cpp_code_lines.append(f'  enums.Set("{enum_name}", _{enum_name});')
-        cpp_code_lines.append("")
-    
-    cpp_code_lines.extend([
-        "  freeze.Call({enums});",
-        '  exports.Set("enums", enums);',
-        "}",
-        ""
-    ])
-    
-    newline = chr(10)
-    cpp_code = newline.join(cpp_code_lines)
-    
+
+    generated_enums = {}
+
+    enums = bindings["enums"]
+    for enum in enums:
+        name: str = enum["name"]
+
+        generated_entries = {}
+
+        for element in enum["elements"]:
+            is_internal = element["is_internal"]
+            is_count = element["is_count"]
+
+            if is_internal or is_count:
+                continue
+
+            element_name: str = element["name"]
+            element_value: int = element["value"]
+
+            simplified_element_name = element_name.removeprefix(name)
+            if simplified_element_name == element_name:
+                # Special case mapping for key modifiers
+                if simplified_element_name.startswith("ImGuiMod_"):
+                    simplified_element_name = "Mod" + \
+                        simplified_element_name.removeprefix("ImGuiMod_")
+                else:
+                    print(f"{element_name=} is not prefixed with enum {name=}")
+                    continue
+
+            simplified_element_name = simplified_element_name.removeprefix("_")
+
+            if simplified_element_name[0].isdigit():
+                simplified_element_name = "_" + simplified_element_name
+
+            generated_entries[simplified_element_name] = element_value
+
+        if name.startswith("ImGui"):
+            name = name.removeprefix("ImGui")
+        elif name.startswith("Im"):
+            name = name.removeprefix("Im")
+
+        name = name.removesuffix("_")
+        name = name.removeprefix("_")
+
+        generated_enums[name] = generated_entries
+
+    lines = []
+
+    for name, entries in generated_enums.items():
+        lines.append(f"Napi::Object _{name} = Napi::Object::New(env);")
+
+        for element_name, element_value in entries.items():
+            lines.append(f'_{name}["{element_name}"] = Napi::Number::New(env, {element_value});')
+
+        lines.append(f'freeze.Call({{_{name}}});')
+        lines.append(f'enums["{name}"] = _{name};')
+        lines.append("")
+
+    enum_cpp = ENUMS_CPP_FORMAT.replace("{enums}", "\n  ".join(lines).strip())
+
+    lines = []
+
+    for name, entries in generated_enums.items():
+        lines.append(f'export enum {name} {{')
+
+        for element_name, element_value in entries.items():
+            lines.append(f'  {element_name} = {element_value},')
+
+        lines.append("}")
+        lines.append("")
+
+    enum_dts = "\n".join(lines)
+
     cpp_file = GEN_NAPI / "enums.cpp"
-    cpp_file.write_text(cpp_code)
-    print(f"Generated {cpp_file}")
-    
-    # Write enums.h header
-    h_code = (
-        "// AUTO-GENERATED - DO NOT EDIT\n"
-        "#pragma once\n"
-        "#include <napi.h>\n"
-        "\n"
-        "void InitEnums(Napi::Env env, Napi::Object exports);\n"
-    )
-    
-    h_file = GEN_NAPI / "enums.h"
-    h_file.write_text(h_code)
-    print(f"Generated {h_file}")
+    cpp_file.write_text(enum_cpp)
+
+    dts_file = GEN_DTS / "enums.d.ts"
+    dts_file.write_text(enum_dts)

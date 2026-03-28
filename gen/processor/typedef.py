@@ -1,3 +1,5 @@
+from config import GEN_DTS
+
 EXCLUDED_TYPEDEFS = [
     # Support for custom allocators is not planned
     # Perhaps those can be added in the future
@@ -112,9 +114,14 @@ def process_typedefs(bindings):
             continue
 
 
-    print("--- Type declarations ---")
+    lines = []
     for name, info in type_declarations.items():
         if "comment" in info and info["comment"] is not None:
-            print(f"type {name} = {info["ts_type"]}; // {info["comment"]}")
+            lines.append(f"type {name} = {info["ts_type"]}; // {info["comment"]}")
         else:
-            print(f"type {name} = {info["ts_type"]};")
+            lines.append(f"type {name} = {info["ts_type"]};")
+
+    enum_dts = "\n".join(lines)
+
+    dts_file = GEN_DTS / "typedefs.d.ts"
+    dts_file.write_text(enum_dts)
