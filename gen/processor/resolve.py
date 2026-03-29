@@ -65,6 +65,16 @@ def _default_value_cpp(default_val: str, builtin_type: str) -> str:
     return default_val
 
 
+def _enum_ts_type(target: str, processed_enums: dict) -> str | None:
+    """Return the generated TS enum type name for a C enum/enum-typedef target."""
+    if target in processed_enums:
+        return processed_enums[target]
+    underscored = f"{target}_"
+    if underscored in processed_enums:
+        return processed_enums[underscored]
+    return None
+
+
 def _resolve_arg(
     arg: dict,
     idx: int,
@@ -158,7 +168,8 @@ def _resolve_arg(
             }
 
         # Enum (bare value, not pointer)
-        if target in processed_enums or f"{target}_" in processed_enums:
+        enum_ts_type = _enum_ts_type(target, processed_enums)
+        if enum_ts_type is not None:
             if has_default:
                 cpp_default = default_val if default_val != "NULL" else "0"
                 pre = [
@@ -173,7 +184,7 @@ def _resolve_arg(
             return {
                 "pre_lines": pre,
                 "pass_expr": var,
-                "ts_type": "number",
+                "ts_type": enum_ts_type,
                 "is_optional": has_default,
                 "extra_includes": [],
             }
@@ -584,11 +595,12 @@ def _resolve_return(
     if kind == "User":
         target = desc["name"]
 
-        if target in processed_enums or f"{target}_" in processed_enums:
+        enum_ts_type = _enum_ts_type(target, processed_enums)
+        if enum_ts_type is not None:
             return {
                 "call_prefix": f"  {target} _result = ",
                 "return_stmt":  "  return Napi::Number::New(env, static_cast<int32_t>(_result));",
-                "ts_type": "number",
+                "ts_type": enum_ts_type,
                 "extra_includes": [],
             }
 

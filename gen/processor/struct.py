@@ -25,6 +25,7 @@ every individual wrapper.
 import re
 from config import GEN_DTS, GEN_NAPI
 from processor.resolve import _resolve_arg, _resolve_return
+from processor.ts_names import make_unique_ts_identifiers
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Builtin type → NAPI conversion table
@@ -1203,9 +1204,26 @@ def _build_cpp(
     )
 
 
-def _build_dts(all_struct_infos: list[dict]) -> str:
+def _format_type_import(names: set[str], module_path: str) -> str:
+    if not names:
+        return ""
+    return f"import type {{ {', '.join(sorted(names))} }} from \"{module_path}\";\n"
+
+
+def _build_dts(
+    all_struct_infos: list[dict],
+    enum_type_names: set[str],
+    typedef_type_names: set[str],
+) -> str:
     """Return the combined structs.d.ts content."""
-    lines = []
+    lines = ["// Auto-generated — do not edit."]
+    lines.append(_format_type_import(enum_type_names, "./enums").rstrip())
+    lines.append(_format_type_import(typedef_type_names, "./typedefs").rstrip())
+    lines.append(
+        'import type { BoolRef, CallbackRef, DoubleRef, FloatRef, IntRef, StringListRef, StringRef } from "../../dts/ref";'
+    )
+    lines.append("")
+
     for struct_info in all_struct_infos:
         class_name = struct_info["cpp_class_name"]
         is_by_ref = struct_info.get("is_by_ref", False)
@@ -1217,8 +1235,10 @@ def _build_dts(all_struct_infos: list[dict]) -> str:
             ctor_line = f"  private constructor();"
         else:
             scalar_fields = [f for f in resolved_fields if f["is_scalar"]]
+            ctor_param_names = make_unique_ts_identifiers([f["js_name"] for f in scalar_fields])
             ctor_params = ", ".join(
-                f"{f['js_name']}?: {f['ts_type']}" for f in scalar_fields
+                f"{name}?: {field['ts_type']}"
+                for name, field in zip(ctor_param_names, scalar_fields)
             )
             ctor_line = f"  constructor({ctor_params});"
 
@@ -1231,10 +1251,26 @@ def _build_dts(all_struct_infos: list[dict]) -> str:
         # Build method signatures.
         method_sig_lines = []
         for m in struct_info.get("methods", []):
-            ts_params = ", ".join(
-                f"{a['_name']}{'?' if a['is_optional'] else ''}: {a['ts_type']}"
-                for a in m["args"]
+            visible_args = [
+                a for a in m["args"]
                 if not a.get("_absorbed") and a.get("ts_type") is not None
+            ]
+            method_param_names = make_unique_ts_identifiers([
+                a.get("_name", "arg") for a in visible_args
+            ])
+
+            seen_optional = False
+            method_param_tokens = []
+            for name, arg in zip(method_param_names, visible_args):
+                is_optional = arg["is_optional"] or seen_optional
+                if is_optional:
+                    seen_optional = True
+                method_param_tokens.append(
+                    f"{name}{'?' if is_optional else ''}: {arg['ts_type']}"
+                )
+
+            ts_params = ", ".join(
+                method_param_tokens
             )
             method_sig_lines.append(f"  {m['js_name']}({ts_params}): {m['ret']['ts_type']};")
 
@@ -1435,7 +1471,19 @@ def process_structs(
 
     # Write combined TypeScript declarations.
     dts_path = GEN_DTS / "structs.d.ts"
-    dts_path.write_text(_build_dts(all_struct_infos))
+    typedef_type_names = {
+        td["name"]
+        for name, td in processed_typedefs.items()
+        if td.get("name")
+        and name not in processed_enums
+        and f"{name}_" not in processed_enums
+    }
+    enum_type_names = {
+        enum_name
+        for enum_name in processed_enums.values()
+        if enum_name
+    }
+    dts_path.write_text(_build_dts(all_struct_infos, enum_type_names, typedef_type_names))
 
     # Write the init shim that module.cpp calls to register all wrappers.
     class_names = [info["cpp_class_name"] for info in all_struct_infos]

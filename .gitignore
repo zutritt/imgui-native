@@ -45,6 +45,12 @@ build
 lib/gen/*
 !lib/gen/.gitkeep
 
+# Prebuilt release artifacts
+prebuild/**/*.node
+
+# ImGui runtime state
+imgui.ini
+
 # python
 __pycache__
 *.pyc

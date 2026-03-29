@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 from config import BINDINGS_FILE
+from config import GEN_BACKEND_NAPI
+from config import GEN_BACKENDS
 from config import GEN_DTS
 from config import GEN_NAPI
 from processor.enum import process_enums
@@ -30,6 +32,8 @@ def main():
 
     clean_dir(GEN_NAPI)
     clean_dir(GEN_DTS)
+    clean_dir(GEN_BACKENDS)
+    clean_dir(GEN_BACKEND_NAPI)
 
     print("Output directories cleaned")
 

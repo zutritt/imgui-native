@@ -5,27 +5,43 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+option(IMGUI_ENABLE_LTO "Enable link-time optimization for Release builds" ON)
 
-add_compile_options(
-  -O3
-  -fno-exceptions
-  -fno-rtti
-  -fvisibility=hidden
-  -flto=auto
-  -ffunction-sections
-  -fdata-sections
-)
+if(MSVC)
+  add_compile_options(
+    /utf-8
+    /EHsc
+    /GR-
+    /bigobj
+  )
+  add_compile_options($<$<CONFIG:Release>:/O2>)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+else()
+  add_compile_options(
+    -fno-exceptions
+    -fno-rtti
+    -fvisibility=hidden
+    -ffunction-sections
+    -fdata-sections
+  )
+  add_compile_options($<$<CONFIG:Release>:-O3>)
+  add_link_options($<$<CONFIG:Release>:-Wl,--gc-sections>)
+  if(APPLE)
+    add_link_options($<$<CONFIG:Release>:-Wl,-dead_strip>)
+  endif()
+  if(CMAKE_BUILD_TYPE MATCHES Release)
+    add_link_options(-s)
+  endif()
+endif()
 
-add_link_options(
-  -O3
-  -Wl,--gc-sections
-  -Wl,-z,now
-  -flto=auto
-)
-
-if(CMAKE_BUILD_TYPE MATCHES Release)
-  add_link_options(-s)
+if(IMGUI_ENABLE_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT IMGUI_IPO_SUPPORTED OUTPUT IMGUI_IPO_ERROR)
+  if(IMGUI_IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  else()
+    message(WARNING "IPO/LTO not supported by this toolchain: ${IMGUI_IPO_ERROR}")
+  endif()
 endif()
 
 add_compile_definitions(
@@ -95,13 +111,12 @@ set(DEAR_BINDINGS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/deps/dear_bindings/src)
 # ─── Backend options ────────────────────────────────────────────────────────
 # Default build: GLFW platform backend + OpenGL3 renderer backend.
 # Other backends must be enabled explicitly (-DIMGUI_BACKEND_SDL2=ON etc.).
+# Note: JS also exposes ImplGlfw3 as an alias of ImplGlfw for convenience.
 option(IMGUI_BACKEND_GLFW       "Compile with GLFW platform backend"         ON)
 option(IMGUI_RENDERER_OPENGL3   "Compile with OpenGL3 renderer backend"      ON)
 option(IMGUI_RENDERER_OPENGL2   "Compile with OpenGL2 renderer backend"      OFF)
 option(IMGUI_BACKEND_SDL2       "Compile with SDL2 platform backend"         OFF)
 option(IMGUI_BACKEND_SDL3       "Compile with SDL3 platform backend"         OFF)
-option(IMGUI_RENDERER_SDLRENDERER2 "Compile with SDL2 renderer backend"     OFF)
-option(IMGUI_RENDERER_SDLRENDERER3 "Compile with SDL3 renderer backend"     OFF)
 
 set(BACKEND_SOURCES "")
 set(BACKEND_DEFINES "")
@@ -110,34 +125,23 @@ set(BACKEND_LIBS "")
 
 # ── GLFW platform backend ───────────────────────────────────────────────────
 if(IMGUI_BACKEND_GLFW)
+  set(GLFW_TARGET "")
+  find_package(glfw3 CONFIG QUIET)
   find_package(glfw3 QUIET)
-  if(NOT glfw3_FOUND)
-    # Fallback: look for the library directly (system install or deps-opengl-raub)
-    find_library(GLFW_LIB NAMES glfw glfw3
-      PATHS
-        "${CMAKE_SOURCE_DIR}/node_modules/deps-opengl-raub/bin-linux"
-        /usr/lib /usr/local/lib
-    )
-    find_path(GLFW_INCLUDE NAMES GLFW/glfw3.h
-      PATHS
-        "${CMAKE_SOURCE_DIR}/node_modules/deps-opengl-raub/include"
-        /usr/include /usr/local/include
-    )
-    if(GLFW_LIB AND GLFW_INCLUDE)
-      add_library(glfw3_imported UNKNOWN IMPORTED)
-      set_target_properties(glfw3_imported PROPERTIES
-        IMPORTED_LOCATION "${GLFW_LIB}"
-        INTERFACE_INCLUDE_DIRECTORIES "${GLFW_INCLUDE}"
-      )
-      set(GLFW_TARGET glfw3_imported)
-      message(STATUS "GLFW found: ${GLFW_LIB}")
-    else()
-      message(WARNING "GLFW not found — disabling IMGUI_BACKEND_GLFW")
-      set(IMGUI_BACKEND_GLFW OFF)
-    endif()
-  else()
+
+  if(TARGET glfw)
     set(GLFW_TARGET glfw)
-    message(STATUS "GLFW found via find_package")
+  elseif(TARGET glfw3::glfw)
+    set(GLFW_TARGET glfw3::glfw)
+  elseif(TARGET glfw3)
+    set(GLFW_TARGET glfw3)
+  endif()
+
+  if(NOT GLFW_TARGET)
+    message(WARNING "GLFW not found via CMake package — disabling IMGUI_BACKEND_GLFW")
+    set(IMGUI_BACKEND_GLFW OFF)
+  else()
+    message(STATUS "GLFW target: ${GLFW_TARGET}")
   endif()
 endif()
 
@@ -152,18 +156,26 @@ if(IMGUI_BACKEND_GLFW)
 endif()
 
 # ── OpenGL3 renderer backend ────────────────────────────────────────────────
-if(IMGUI_RENDERER_OPENGL3)
-  # imgui_impl_opengl3 uses a bundled GL loader; on Linux it needs libGL and libdl.
-  find_library(OPENGL_LIB NAMES GL
-    PATHS
-      "${CMAKE_SOURCE_DIR}/node_modules/deps-opengl-raub/bin-linux"
-      /usr/lib /usr/local/lib
-  )
-  if(NOT OPENGL_LIB)
-    message(WARNING "libGL not found — disabling IMGUI_RENDERER_OPENGL3")
+set(OPENGL_TARGET "")
+set(OPENGL_BACKEND_LIBS "")
+if(IMGUI_RENDERER_OPENGL3 OR IMGUI_RENDERER_OPENGL2)
+  find_package(OpenGL QUIET)
+  if(TARGET OpenGL::GL)
+    set(OPENGL_TARGET OpenGL::GL)
+  elseif(TARGET OpenGL::OpenGL)
+    set(OPENGL_TARGET OpenGL::OpenGL)
+  endif()
+
+  if(NOT OPENGL_TARGET)
+    message(WARNING "OpenGL not found via CMake package — disabling OpenGL backends")
     set(IMGUI_RENDERER_OPENGL3 OFF)
+    set(IMGUI_RENDERER_OPENGL2 OFF)
   else()
-    message(STATUS "OpenGL found: ${OPENGL_LIB}")
+    set(OPENGL_BACKEND_LIBS ${OPENGL_TARGET})
+    if(CMAKE_DL_LIBS)
+      list(APPEND OPENGL_BACKEND_LIBS ${CMAKE_DL_LIBS})
+    endif()
+    message(STATUS "OpenGL target: ${OPENGL_TARGET}")
   endif()
 endif()
 
@@ -174,48 +186,42 @@ if(IMGUI_RENDERER_OPENGL3)
   )
   list(APPEND BACKEND_DEFINES IMGUI_RENDERER_OPENGL3)
   list(APPEND BACKEND_INCLUDES "${CMAKE_SOURCE_DIR}/deps/imgui/backends")
-  list(APPEND BACKEND_LIBS ${OPENGL_LIB} dl)
+  list(APPEND BACKEND_LIBS ${OPENGL_BACKEND_LIBS})
 endif()
 
 # ── OpenGL2 renderer backend ────────────────────────────────────────────────
 if(IMGUI_RENDERER_OPENGL2)
-  if(NOT OPENGL_LIB)
-    find_library(OPENGL_LIB NAMES GL
-      PATHS "${CMAKE_SOURCE_DIR}/node_modules/deps-opengl-raub/bin-linux" /usr/lib)
-  endif()
-  if(OPENGL_LIB)
+  if(OPENGL_TARGET)
     list(APPEND BACKEND_SOURCES
       deps/imgui/backends/imgui_impl_opengl2.cpp
       "${CMAKE_SOURCE_DIR}/lib/gen/backends/dcimgui_impl_opengl2.cpp"
     )
     list(APPEND BACKEND_DEFINES IMGUI_RENDERER_OPENGL2)
     list(APPEND BACKEND_INCLUDES "${CMAKE_SOURCE_DIR}/deps/imgui/backends")
-    list(APPEND BACKEND_LIBS ${OPENGL_LIB} dl)
+    list(APPEND BACKEND_LIBS ${OPENGL_BACKEND_LIBS})
   else()
-    message(WARNING "libGL not found — disabling IMGUI_RENDERER_OPENGL2")
+    message(WARNING "OpenGL target missing — disabling IMGUI_RENDERER_OPENGL2")
     set(IMGUI_RENDERER_OPENGL2 OFF)
   endif()
 endif()
 
 # ── SDL2 platform backend ───────────────────────────────────────────────────
 if(IMGUI_BACKEND_SDL2)
+  set(SDL2_TARGET "")
+  find_package(SDL2 CONFIG QUIET)
   find_package(SDL2 QUIET)
-  if(NOT SDL2_FOUND)
-    find_library(SDL2_LIB NAMES SDL2)
-    find_path(SDL2_INCLUDE NAMES SDL2/SDL.h SDL.h)
-    if(SDL2_LIB AND SDL2_INCLUDE)
-      add_library(SDL2_imported UNKNOWN IMPORTED)
-      set_target_properties(SDL2_imported PROPERTIES
-        IMPORTED_LOCATION "${SDL2_LIB}"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE}"
-      )
-      set(SDL2_TARGET SDL2_imported)
-    else()
-      message(WARNING "SDL2 not found — disabling IMGUI_BACKEND_SDL2")
-      set(IMGUI_BACKEND_SDL2 OFF)
-    endif()
-  else()
+
+  if(TARGET SDL2::SDL2)
     set(SDL2_TARGET SDL2::SDL2)
+  elseif(TARGET SDL2::SDL2-static)
+    set(SDL2_TARGET SDL2::SDL2-static)
+  endif()
+
+  if(NOT SDL2_TARGET)
+    message(WARNING "SDL2 not found via CMake package — disabling IMGUI_BACKEND_SDL2")
+    set(IMGUI_BACKEND_SDL2 OFF)
+  else()
+    message(STATUS "SDL2 target: ${SDL2_TARGET}")
   endif()
 endif()
 
@@ -229,41 +235,23 @@ if(IMGUI_BACKEND_SDL2)
   list(APPEND BACKEND_LIBS ${SDL2_TARGET})
 endif()
 
-# ── SDL2 renderer backend ───────────────────────────────────────────────────
-if(IMGUI_RENDERER_SDLRENDERER2)
-  if(NOT SDL2_TARGET)
-    message(WARNING "SDL2 not configured — disabling IMGUI_RENDERER_SDLRENDERER2")
-    set(IMGUI_RENDERER_SDLRENDERER2 OFF)
-  else()
-    list(APPEND BACKEND_SOURCES
-      deps/imgui/backends/imgui_impl_sdlrenderer2.cpp
-      "${CMAKE_SOURCE_DIR}/lib/gen/backends/dcimgui_impl_sdlrenderer2.cpp"
-    )
-    list(APPEND BACKEND_DEFINES IMGUI_RENDERER_SDLRENDERER2)
-    list(APPEND BACKEND_INCLUDES "${CMAKE_SOURCE_DIR}/deps/imgui/backends")
-    list(APPEND BACKEND_LIBS ${SDL2_TARGET})
-  endif()
-endif()
-
 # ── SDL3 platform backend ───────────────────────────────────────────────────
 if(IMGUI_BACKEND_SDL3)
+  set(SDL3_TARGET "")
+  find_package(SDL3 CONFIG QUIET)
   find_package(SDL3 QUIET)
-  if(NOT SDL3_FOUND)
-    find_library(SDL3_LIB NAMES SDL3)
-    find_path(SDL3_INCLUDE NAMES SDL3/SDL.h)
-    if(SDL3_LIB AND SDL3_INCLUDE)
-      add_library(SDL3_imported UNKNOWN IMPORTED)
-      set_target_properties(SDL3_imported PROPERTIES
-        IMPORTED_LOCATION "${SDL3_LIB}"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL3_INCLUDE}"
-      )
-      set(SDL3_TARGET SDL3_imported)
-    else()
-      message(WARNING "SDL3 not found — disabling IMGUI_BACKEND_SDL3")
-      set(IMGUI_BACKEND_SDL3 OFF)
-    endif()
-  else()
+
+  if(TARGET SDL3::SDL3)
     set(SDL3_TARGET SDL3::SDL3)
+  elseif(TARGET SDL3::SDL3-static)
+    set(SDL3_TARGET SDL3::SDL3-static)
+  endif()
+
+  if(NOT SDL3_TARGET)
+    message(WARNING "SDL3 not found via CMake package — disabling IMGUI_BACKEND_SDL3")
+    set(IMGUI_BACKEND_SDL3 OFF)
+  else()
+    message(STATUS "SDL3 target: ${SDL3_TARGET}")
   endif()
 endif()
 
@@ -275,22 +263,6 @@ if(IMGUI_BACKEND_SDL3)
   list(APPEND BACKEND_DEFINES IMGUI_BACKEND_SDL3)
   list(APPEND BACKEND_INCLUDES "${CMAKE_SOURCE_DIR}/deps/imgui/backends")
   list(APPEND BACKEND_LIBS ${SDL3_TARGET})
-endif()
-
-# ── SDL3 renderer backend ───────────────────────────────────────────────────
-if(IMGUI_RENDERER_SDLRENDERER3)
-  if(NOT SDL3_TARGET)
-    message(WARNING "SDL3 not configured — disabling IMGUI_RENDERER_SDLRENDERER3")
-    set(IMGUI_RENDERER_SDLRENDERER3 OFF)
-  else()
-    list(APPEND BACKEND_SOURCES
-      deps/imgui/backends/imgui_impl_sdlrenderer3.cpp
-      "${CMAKE_SOURCE_DIR}/lib/gen/backends/dcimgui_impl_sdlrenderer3.cpp"
-    )
-    list(APPEND BACKEND_DEFINES IMGUI_RENDERER_SDLRENDERER3)
-    list(APPEND BACKEND_INCLUDES "${CMAKE_SOURCE_DIR}/deps/imgui/backends")
-    list(APPEND BACKEND_LIBS ${SDL3_TARGET})
-  endif()
 endif()
 
 message(STATUS "Active backends: ${BACKEND_DEFINES}")

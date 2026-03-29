@@ -1,18 +1,49 @@
 {
-  "name": "imgui",
-  "module": "src/index.ts",
+  "name": "imgui-native",
+  "version": "1.0.0",
+  "description": "Native Node.js bindings for Dear ImGui (N-API) with prebuilt binaries.",
   "type": "module",
-  "private": true,
-  "scripts": {
-    "build": "cmake-js build",
-    "test": "bun test"
+  "private": false,
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./lib/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
   },
+  "files": [
+    "src/index.js",
+    "lib/types.d.ts",
+    "lib/dts/**/*.d.ts",
+    "lib/gen/dts/**/*.d.ts",
+    "prebuild/**/*.node"
+  ],
+  "scripts": {
+    "generate": "python3 gen/main.py",
+    "build": "cmake-js build",
+    "test": "bun test tests",
+    "typecheck": "bunx tsc --noEmit",
+    "prepack": "npm run generate"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "imgui",
+    "dear-imgui",
+    "napi",
+    "native-addon"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "cmake-js": "^8.0.0",
     "node-addon-api": "^8.6.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

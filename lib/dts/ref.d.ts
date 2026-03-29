@@ -3,7 +3,7 @@ export class BoolRef {
   constructor(value: boolean);
 
   value: boolean;
-};
+}
 
 export class IntRef {
   constructor();
@@ -33,6 +33,15 @@ export class StringRef {
   value: string;
 
   resize(newCapacity: number | bigint): void;
+}
+
+export class StringListRef {
+  constructor();
+  constructor(values: string[]);
+
+  readonly count: number;
+
+  update(values: string[]): void;
 }
 
 export class CallbackRef<CallbackType extends (...args: unknown[]) => unknown> {

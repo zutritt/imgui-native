@@ -1,0 +1,176 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to npm after packaging"
+        required: true
+        type: boolean
+        default: false
+      npm_tag:
+        description: "npm dist-tag"
+        required: true
+        type: string
+        default: "latest"
+
+permissions:
+  contents: read
+
+jobs:
+  build-prebuilds:
+    name: Build ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+          - os: macos-13
+            platform: darwin
+            arch: x64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate bindings
+        run: python gen/main.py
+
+      - name: Build native addon
+        run: npm run build
+
+      - name: Collect prebuild binary
+        shell: bash
+        run: |
+          mkdir -p "prebuild/${{ matrix.platform }}-${{ matrix.arch }}"
+          cp "build/Release/imgui.node" "prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node"
+
+      - name: Upload prebuild artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
+          path: prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node
+          if-no-files-found: error
+
+  pack:
+    name: Assemble npm package
+    runs-on: ubuntu-latest
+    needs: build-prebuilds
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download prebuild artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prebuild-*
+          path: artifacts
+
+      - name: Reconstruct prebuild layout
+        shell: bash
+        run: |
+          mkdir -p prebuild/linux-x64 prebuild/win32-x64 prebuild/darwin-x64 prebuild/darwin-arm64
+          cp artifacts/prebuild-linux-x64/imgui.node prebuild/linux-x64/imgui.node
+          cp artifacts/prebuild-win32-x64/imgui.node prebuild/win32-x64/imgui.node
+          cp artifacts/prebuild-darwin-x64/imgui.node prebuild/darwin-x64/imgui.node
+          cp artifacts/prebuild-darwin-arm64/imgui.node prebuild/darwin-arm64/imgui.node
+
+      - name: Regenerate declarations
+        run: python gen/main.py
+
+      - name: Verify prebuild matrix payload
+        shell: bash
+        run: |
+          test -f prebuild/linux-x64/imgui.node
+          test -f prebuild/win32-x64/imgui.node
+          test -f prebuild/darwin-x64/imgui.node
+          test -f prebuild/darwin-arm64/imgui.node
+
+      - name: Verify package contents
+        run: npm pack --dry-run
+
+      - name: Build package tarball
+        id: pack
+        shell: bash
+        run: |
+          TARBALL="$(npm pack | tail -n 1)"
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download npm package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: .
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish package
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.npm_tag || 'latest' }}
+        run: npm publish ./*.tgz --access public --provenance --tag "$NPM_TAG"

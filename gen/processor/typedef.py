@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from config import GEN_DTS
+from processor.ts_names import make_unique_ts_identifiers
 
 EXCLUDED_TYPEDEFS = [
     # Support for custom allocators is not planned
@@ -21,6 +24,144 @@ BUILTIN_TYPE_TO_TS_TYPE = {
     "unsigned_long_long": "bigint",
 }
 
+
+def _strip_imgui_prefix(name: str) -> str:
+    if name.startswith("ImGui"):
+        return name.removeprefix("ImGui")
+    if name.startswith("Im"):
+        return name.removeprefix("Im")
+    return name
+
+
+def _resolve_user_ts_type(
+    target_name: str,
+    typedefs_by_name: dict,
+    type_declarations: dict,
+    processed_enums: dict,
+) -> str:
+    if target_name == "size_t":
+        return "number"
+
+    if target_name in processed_enums:
+        return processed_enums[target_name]
+
+    underscored = f"{target_name}_"
+    if underscored in processed_enums:
+        return processed_enums[underscored]
+
+    # Typedefs can alias other typedefs declared earlier in this pass.
+    if target_name in type_declarations:
+        return type_declarations[target_name]["name"]
+
+    # Typedef referenced before it was visited in this pass.
+    if target_name in typedefs_by_name:
+        return _strip_imgui_prefix(target_name)
+
+    # Non-typedef user type is typically a struct/class from structs.d.ts.
+    return f'import("./structs").{_strip_imgui_prefix(target_name)}'
+
+
+def _callback_ts_type_from_description(
+    desc: dict,
+    typedefs_by_name: dict,
+    type_declarations: dict,
+    processed_enums: dict,
+) -> str:
+    kind = desc.get("kind")
+
+    if kind == "Builtin":
+        builtin_type = desc.get("builtin_type")
+        if builtin_type == "void":
+            return "void"
+        return BUILTIN_TYPE_TO_TS_TYPE.get(builtin_type, "unknown")
+
+    if kind == "User":
+        target_name = desc.get("name", "")
+        return _resolve_user_ts_type(target_name, typedefs_by_name, type_declarations, processed_enums)
+
+    if kind == "Pointer":
+        inner = desc.get("inner_type", {})
+        inner_kind = inner.get("kind")
+        storage_classes = inner.get("storage_classes", [])
+
+        if inner_kind == "Builtin":
+            inner_builtin = inner.get("builtin_type")
+            if inner_builtin == "char" and "const" in storage_classes:
+                return "string"
+            if inner_builtin == "void":
+                return "unknown"
+            # Generic raw data pointers remain opaque for now.
+            return "unknown"
+
+        if inner_kind == "User":
+            target_name = inner.get("name", "")
+            return _resolve_user_ts_type(target_name, typedefs_by_name, type_declarations, processed_enums)
+
+        if inner_kind == "Function":
+            return "CallbackRef<(...args: unknown[]) => unknown>"
+
+        return "unknown"
+
+    if kind == "Type":
+        inner = desc.get("inner_type")
+        if isinstance(inner, dict):
+            return _callback_ts_type_from_description(inner, typedefs_by_name, type_declarations, processed_enums)
+        return "unknown"
+
+    if kind == "Array":
+        inner = desc.get("inner_type", {})
+        if inner.get("kind") != "Builtin":
+            return "unknown"
+
+        inner_builtin = inner.get("builtin_type")
+        if inner_builtin == "float":
+            return "Float32Array"
+        if inner_builtin in ("int", "short"):
+            return "Int32Array"
+        if inner_builtin in ("unsigned_int", "unsigned_short", "unsigned_char"):
+            return "Uint32Array"
+        if inner_builtin == "char":
+            return "string"
+        return "unknown"
+
+    return "unknown"
+
+
+def _build_callback_ref_signature(
+    type_details: dict,
+    typedefs_by_name: dict,
+    type_declarations: dict,
+    processed_enums: dict,
+) -> str:
+    arguments = type_details.get("arguments", [])
+    raw_arg_names = [
+        arg.get("name") or f"arg{idx + 1}"
+        for idx, arg in enumerate(arguments)
+    ]
+    arg_names = make_unique_ts_identifiers(raw_arg_names)
+
+    ts_params = []
+    for idx, arg in enumerate(arguments):
+        desc = arg.get("type", {}).get("description", {})
+        ts_type = _callback_ts_type_from_description(
+            desc,
+            typedefs_by_name,
+            type_declarations,
+            processed_enums,
+        )
+        ts_params.append(f"{arg_names[idx]}: {ts_type}")
+
+    return_desc = type_details.get("return_type", {}).get("description", {})
+    return_type = _callback_ts_type_from_description(
+        return_desc,
+        typedefs_by_name,
+        type_declarations,
+        processed_enums,
+    )
+
+    args = ", ".join(ts_params)
+    return f"CallbackRef<({args}) => {return_type}>"
+
 def process_typedefs(bindings, processed_enums):
     """
         Process typedefs from the bindings and generate DTS files.
@@ -35,14 +176,10 @@ def process_typedefs(bindings, processed_enums):
 
     def declare_type(name: str, ts_type: str, builtin_type: str, comment: str | None = None):
         if name in type_declarations:
-            current_ts_type = type_declarations[name].ts_type
+            current_ts_type = type_declarations[name]["ts_type"]
             print(f"Duplicate typedef {name=}, investigate: {current_ts_type} {ts_type=}")
 
-        renamed = name
-        if renamed.startswith("ImGui"):
-            renamed = renamed.removeprefix("ImGui")
-        elif renamed.startswith("Im"):
-            renamed = renamed.removeprefix("Im")
+        renamed = _strip_imgui_prefix(name)
 
         type_declarations[name] = {
             "name": renamed,
@@ -96,8 +233,13 @@ def process_typedefs(bindings, processed_enums):
                 print(f"Unknown typedef target {name=} {type_kind=} {target_name=}")
                 continue
             else:
-                renamed = type_declarations[target_name]["name"]
-                declare_type(name, renamed, type_declarations[target_name]["builtin_type"])
+                if target_name in type_declarations:
+                    renamed = type_declarations[target_name]["name"]
+                    builtin_type = type_declarations[target_name]["builtin_type"]
+                else:
+                    renamed = _strip_imgui_prefix(target_name)
+                    builtin_type = "<unknown>"
+                declare_type(name, renamed, builtin_type)
 
             # Now we know we know that resulting type will be just an alias to another one
         elif type_kind == "Type":
@@ -109,16 +251,18 @@ def process_typedefs(bindings, processed_enums):
             flavour = type_details["flavour"]
 
             if flavour == "function_pointer":
-                _arguments = type_details["arguments"]
-                _return_type = type_details["return_type"]
-
-                # TODO process function
+                callback_signature = _build_callback_ref_signature(
+                    type_details,
+                    typedefs_by_name,
+                    type_declarations,
+                    processed_enums,
+                )
 
                 declare_type(
                     name,
-                    "CallbackRef<(...args: unknown[]) => unknown>",
-                    "<unknown>",
-                    "Function pointer not supported yet")
+                    callback_signature,
+                    "<function_pointer>",
+                )
                 continue
 
             else:
@@ -142,11 +286,16 @@ def process_typedefs(bindings, processed_enums):
         renamed = info["name"]
 
         if "comment" in info and info["comment"] is not None:
-            lines.append(f"type {renamed} = {info["ts_type"]}; // {info["comment"]}")
+            lines.append(f"export type {renamed} = {info['ts_type']}; // {info['comment']}")
         else:
-            lines.append(f"type {renamed} = {info["ts_type"]};")
+            lines.append(f"export type {renamed} = {info['ts_type']};")
 
-    enum_dts = "\n".join(lines)
+    prelude = [
+        "// Auto-generated — do not edit.",
+        'import type { CallbackRef } from "../../dts/ref";',
+        "",
+    ]
+    enum_dts = "\n".join(prelude + lines) + "\n"
 
     dts_file = GEN_DTS / "typedefs.d.ts"
     dts_file.write_text(enum_dts)

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from config import ROOT_DIR
+from processor.ts_names import make_unique_ts_identifiers
 
 DEAR_BINDINGS_PY = ROOT_DIR / "deps" / "dear_bindings" / "dear_bindings.py"
 IMGUI_DIR = ROOT_DIR / "deps" / "imgui"
@@ -77,22 +78,6 @@ BACKENDS: list[dict] = [
         "js_name": "ImplSDL3",
         "c_prefix": "cImGui_ImplSDL3_",
         "error_msg": "SDL3 backend not compiled — rebuild with -DIMGUI_BACKEND_SDL3=ON",
-    },
-    {
-        "key": "sdlrenderer2",
-        "header": "imgui_impl_sdlrenderer2.h",
-        "define": "IMGUI_RENDERER_SDLRENDERER2",
-        "js_name": "ImplSDLRenderer2",
-        "c_prefix": "cImGui_ImplSDLRenderer2_",
-        "error_msg": "SDL2 renderer not compiled — rebuild with -DIMGUI_RENDERER_SDLRENDERER2=ON",
-    },
-    {
-        "key": "sdlrenderer3",
-        "header": "imgui_impl_sdlrenderer3.h",
-        "define": "IMGUI_RENDERER_SDLRENDERER3",
-        "js_name": "ImplSDLRenderer3",
-        "c_prefix": "cImGui_ImplSDLRenderer3_",
-        "error_msg": "SDL3 renderer not compiled — rebuild with -DIMGUI_RENDERER_SDLRENDERER3=ON",
     },
 ]
 
@@ -368,13 +353,14 @@ def _build_function(func: dict, c_prefix: str, backend: dict) -> dict | None:
     )
 
     # TypeScript signature
-    ts_params = ", ".join(
-        f"{ai['ts_type']}" for ai in args_info
-    )
-    ts_param_names = []
-    for arg, ai in zip(func.get("arguments", []), args_info):
-        ts_param_names.append(f"{arg['name']}: {ai['ts_type']}")
-    ts_sig = f"  {js_name}({', '.join(ts_param_names)}): {ret_info['ts_type']};"
+    ts_param_names = make_unique_ts_identifiers([
+        arg["name"]
+        for arg in func.get("arguments", [])
+    ])
+    ts_param_pairs = []
+    for (arg_name, ai) in zip(ts_param_names, args_info):
+        ts_param_pairs.append(f"{arg_name}: {ai['ts_type']}")
+    ts_sig = f"  {js_name}({', '.join(ts_param_pairs)}): {ret_info['ts_type']};"
 
     return {
         "js_name": js_name,
@@ -506,6 +492,9 @@ def _build_backends_init(backends_info: list[dict]) -> tuple[str, str]:
         f'  exports.Set("{jn}", {jn}_Register(env));'
         for jn in js_names
     )
+    if "ImplGlfw" in js_names:
+        # Alias: users can access GLFW backend as ImplGlfw and ImplGlfw3.
+        set_lines += '\n  exports.Set("ImplGlfw3", exports.Get("ImplGlfw"));'
     cpp = (
         '#include "backends_init.h"\n'
         f"{includes}"
@@ -634,10 +623,20 @@ def process_backends() -> None:
 
     # 5. Write combined backends.d.ts
     dts_path = ROOT_DIR / "lib" / "gen" / "dts" / "backends.d.ts"
+    has_glfw = any(b.get("js_name") == "ImplGlfw" for b in init_info)
+    glfw_alias_dts = ""
+    if has_glfw:
+        glfw_alias_dts = (
+            "\n"
+            "export type ImplGlfw3 = ImplGlfw;\n"
+            "export const ImplGlfw3: ImplGlfw3;\n"
+        )
+
     dts_path.write_text(
         '// Auto-generated — do not edit.\n'
-        '// Import DrawData and TextureData from structs.d.ts where needed.\n\n'
+        'import type { DrawData, TextureData } from "./structs";\n\n'
         + "\n".join(all_dts)
+        + glfw_alias_dts
     )
 
     print(f"  [backend] Generated {len(init_info)} backend namespace(s)")

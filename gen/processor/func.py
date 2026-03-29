@@ -38,6 +38,7 @@ from processor.resolve import _MUTABLE_PTR_WRAPPERS
 from processor.resolve import _default_value_cpp
 from processor.resolve import _resolve_arg
 from processor.resolve import _resolve_return
+from processor.ts_names import make_unique_ts_identifiers
 
 
 def _cpp_name_to_js_name(name: str) -> str:
@@ -259,7 +260,7 @@ export declare function bulletText(text: string): void;
 export declare function setTooltip(text: string): void;
 export declare function setItemTooltip(text: string): void;
 export declare function treeNodeStr(label: string): boolean;
-export declare function treeNodeExStr(label: string, flags?: number): boolean;
+export declare function treeNodeExStr(label: string, flags?: TreeNodeFlags): boolean;
 export declare function debugLog(text: string): void;
 export declare function logText(text: string): void;
 /** Create an ImGui context. The returned external value is an opaque handle. */
@@ -271,13 +272,13 @@ export declare function plotLines(label: string, values: Float32Array, valuesOff
 export declare function plotHistogram(label: string, values: Float32Array, valuesOffset?: number, overlayText?: string | null, scaleMin?: number, scaleMax?: number): void;
 export declare function saveIniSettingsToMemory(): string;
 export declare function combo(label: string, currentItem: IntRef, items: StringListRef, popupMaxHeightInItems?: number): boolean;
-export declare function comboGetter(label: string, currentItem: IntRef, getter: CallbackRef, itemsCount: number, popupMaxHeightInItems?: number): boolean;
+export declare function comboGetter(label: string, currentItem: IntRef, getter: CallbackRef<(idx: number) => string>, itemsCount: number, popupMaxHeightInItems?: number): boolean;
 export declare function listBox(label: string, currentItem: IntRef, items: StringListRef, heightInItems?: number): boolean;
-export declare function listBoxGetter(label: string, currentItem: IntRef, getter: CallbackRef, itemsCount: number, heightInItems?: number): boolean;
-export declare function setNextWindowSizeConstraints(sizeMin: Vec2, sizeMax: Vec2, callback?: CallbackRef | null): void;
-export declare function inputTextEx(label: string, buf: StringRef, flags?: number, callback?: CallbackRef | null): boolean;
-export declare function inputTextMultilineEx(label: string, buf: StringRef, size?: Vec2 | null, flags?: number, callback?: CallbackRef | null): boolean;
-export declare function inputTextWithHintEx(label: string, hint: string, buf: StringRef, flags?: number, callback?: CallbackRef | null): boolean;
+export declare function listBoxGetter(label: string, currentItem: IntRef, getter: CallbackRef<(idx: number) => string>, itemsCount: number, heightInItems?: number): boolean;
+export declare function setNextWindowSizeConstraints(sizeMin: Vec2, sizeMax: Vec2, callback?: SizeCallback | null): void;
+export declare function inputTextEx(label: string, buf: StringRef, flags?: InputTextFlags, callback?: InputTextCallback | null): boolean;
+export declare function inputTextMultilineEx(label: string, buf: StringRef, size?: Vec2 | null, flags?: InputTextFlags, callback?: InputTextCallback | null): boolean;
+export declare function inputTextWithHintEx(label: string, hint: string, buf: StringRef, flags?: InputTextFlags, callback?: InputTextCallback | null): boolean;
 """
 
 
@@ -537,7 +538,10 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
-      ref->GetCallback().Call({wrapper});
+      Napi::Value result = ref->GetCallback().Call({wrapper});
+      if (result.IsNumber()) {
+        return result.As<Napi::Number>().Int32Value();
+      }
       return 0;
     };
     bool _r = ImGui_InputTextEx(_label.c_str(), _buf->Data(), _buf->Capacity(),
@@ -562,7 +566,10 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
-      ref->GetCallback().Call({wrapper});
+      Napi::Value result = ref->GetCallback().Call({wrapper});
+      if (result.IsNumber()) {
+        return result.As<Napi::Number>().Int32Value();
+      }
       return 0;
     };
     bool _r = ImGui_InputTextMultilineEx(_label.c_str(), _buf->Data(), _buf->Capacity(),
@@ -583,7 +590,10 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
-      ref->GetCallback().Call({wrapper});
+      Napi::Value result = ref->GetCallback().Call({wrapper});
+      if (result.IsNumber()) {
+        return result.As<Napi::Number>().Int32Value();
+      }
       return 0;
     };
     bool _r = ImGui_InputTextWithHintEx(_label.c_str(), _hint.c_str(),
@@ -594,28 +604,55 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
 """
 
 
-def _build_dts(func_infos: list[dict]) -> str:
-    """Build funcs.d.ts content."""
-    lines = []
-    for fi in func_infos:
-        ts_args = []
-        for arg in fi["args"]:
-            if arg.get("_absorbed"):
-                continue  # size_t absorbed by StringRef — not visible in TS
-            if arg["ts_type"] is None:
-                continue
-            ts_type = arg["ts_type"]
-            optional = arg["is_optional"]
-            ts_args.append((arg.get("_name", "arg"), ts_type, optional))
+def _format_type_import(names: set[str], module_path: str) -> str:
+  if not names:
+    return ""
+  sorted_names = sorted(names)
+  return f"import type {{ {', '.join(sorted_names)} }} from \"{module_path}\";\n"
 
-        ts_params = ", ".join(
-            f"{n}{'?' if opt else ''}: {t}"
-            for n, t, opt in ts_args
-        )
-        ts_ret = fi["ret"]["ts_type"]
-        lines.append(f"export declare function {fi['js_name']}({ts_params}): {ts_ret};")
 
-    return "\n".join(lines) + "\n"
+def _build_dts(
+  func_infos: list[dict],
+  struct_type_names: set[str],
+  enum_type_names: set[str],
+  typedef_type_names: set[str],
+) -> str:
+  """Build funcs.d.ts content."""
+  lines = ["// Auto-generated — do not edit."]
+  lines.append(_format_type_import(struct_type_names, "./structs").rstrip())
+  lines.append(_format_type_import(enum_type_names, "./enums").rstrip())
+  lines.append(_format_type_import(typedef_type_names, "./typedefs").rstrip())
+  lines.append(
+    'import type { BoolRef, CallbackRef, DoubleRef, FloatRef, IntRef, StringListRef, StringRef } from "../../dts/ref";'
+  )
+  lines.append("")
+
+  for fi in func_infos:
+    visible_args = [
+      a for a in fi["args"]
+      if not a.get("_absorbed") and a.get("ts_type") is not None
+    ]
+    param_names = make_unique_ts_identifiers([
+      a.get("_name", "arg") for a in visible_args
+    ])
+
+    seen_optional = False
+    ts_param_tokens = []
+    for name, arg in zip(param_names, visible_args):
+      is_optional = arg["is_optional"] or seen_optional
+      if is_optional:
+        seen_optional = True
+      ts_param_tokens.append(
+        f"{name}{'?' if is_optional else ''}: {arg['ts_type']}"
+      )
+
+    ts_params = ", ".join(
+      ts_param_tokens
+    )
+    ts_ret = fi["ret"]["ts_type"]
+    lines.append(f"export declare function {fi['js_name']}({ts_params}): {ts_ret};")
+
+  return "\n".join(lines).rstrip() + "\n"
 
 
 # ─── Main entry point ─────────────────────────────────────────────────────────
@@ -660,6 +697,27 @@ def process_functions(
 
     cpp_path.write_text(_build_cpp(func_infos))
     hdr_path.write_text(_build_init_header())
-    dts_path.write_text(_build_dts(func_infos) + _SYNTHETIC_TEXT_DTS)
+    struct_type_names = {
+      s["cpp_class_name"]
+      for s in processed_structs.values()
+      if s.get("cpp_class_name")
+    }
+    enum_type_names = {
+      enum_name
+      for enum_name in processed_enums.values()
+      if enum_name
+    }
+    typedef_type_names = {
+      td["name"]
+      for name, td in processed_typedefs.items()
+      if td.get("name")
+      and name not in processed_enums
+      and f"{name}_" not in processed_enums
+    }
+
+    dts_path.write_text(
+      _build_dts(func_infos, struct_type_names, enum_type_names, typedef_type_names)
+      + _SYNTHETIC_TEXT_DTS
+    )
 
     print(f"  [func] Wrote funcs.cpp, funcs_init.h, funcs.d.ts")
