@@ -34,7 +34,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build native addon
-        run: bun run build
+        run: bun run build -- --parallel 8
 
       - name: Typecheck
         run: bun run typecheck
