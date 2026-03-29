@@ -42,17 +42,12 @@ Current release workflow produces prebuilds for:
 Generate bindings and build:
 
 ```bash
-npm ci
-npm run generate
-npm run build
-npm test
+uv sync
+bun install
+git submodule update --init --recursive
+bun run configure
+bun run build
 ```
-
-## Release Flow
-
-- Push a tag like `v1.0.0` to trigger multi-platform prebuild workers and package assembly.
-- The workflow assembles all prebuilds into `prebuild/<platform>-<arch>/imgui.node` and publishes to npm.
-- Manual workflow dispatch is also available.
 
 ## License
 

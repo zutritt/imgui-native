@@ -22,7 +22,7 @@
     "prebuild/**/*.node"
   ],
   "scripts": {
-    "generate": "python3 gen/main.py",
+    "configure": "cmake-js configure",
     "build": "cmake-js build",
     "test": "bun test tests",
     "typecheck": "bunx tsc --noEmit",
