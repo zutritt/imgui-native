@@ -1,11 +1,16 @@
 #include <napi.h>
 
+#include "gen/backend_napi/backends_init.h"
+#include "gen/napi/enums_init.h"
+#include "gen/napi/funcs_init.h"
+#include "gen/napi/structs_init.h"
 #include "ref/bool.h"
 #include "ref/callback.h"
 #include "ref/double.h"
 #include "ref/float.h"
 #include "ref/int.h"
 #include "ref/string.h"
+#include "ref/string_list.h"
 
 void (*callback)(void* userData, int param) = nullptr;
 void* userData = nullptr;
@@ -16,7 +21,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   FloatRef::Init(env, exports);
   DoubleRef::Init(env, exports);
   StringRef::Init(env, exports);
+  StringListRef::Init(env, exports);
   CallbackRef::Init(env, exports);
+  InitEnums(env, exports);
+  InitStructs(env, exports);
+  InitFuncs(env, exports);
+  InitBackends(env, exports);
 
   exports["setCallback"] =
       Napi::Function::New(env, [](const Napi::CallbackInfo& info) {

@@ -1,12 +1,11 @@
 from config import GEN_DTS
 from config import GEN_NAPI
 
-ENUMS_CPP_FORMAT= """
-#include <napi.h>
+ENUMS_CPP_FORMAT = """
+#include "enums_init.h"
 
 void InitEnums(Napi::Env env, Napi::Object exports)
 {
-  Napi::Object enums = Napi::Object::New(env);
   Napi::Function freeze = env
     .Global()
     .Get("Object")
@@ -18,14 +17,33 @@ void InitEnums(Napi::Env env, Napi::Object exports)
 }
 """
 
+ENUMS_INIT_H = """#pragma once
+#include <napi.h>
+
+// Register all generated ImGui enum objects on exports.
+// Called once from module.cpp Init().
+void InitEnums(Napi::Env env, Napi::Object exports);
+"""
+
 
 def process_enums(bindings):
     """
-        Process typedefs from the bindings and generate DTS files and C++ napi code.
+        Process enums from the bindings and generate DTS files and C++ napi code.
+
+        Returns a tuple of:
+          enum_names:   dict mapping original C enum name → stripped JS name
+          count_values: dict mapping count constant name → resolved int value
+                        (e.g. "ImGuiCol_COUNT" → 62). Needed by the struct
+                        processor to resolve fixed-array bounds like
+                        `ImVec4 Colors[ImGuiCol_COUNT]`.
     """
 
     generated_enums = {}
     enum_names = {}
+    # Collect is_count elements separately — they are excluded from the public
+    # enum objects but the struct processor needs their numeric values to size
+    # fixed C arrays (e.g. ImGuiCol_COUNT, ImGuiKey_NamedKey_COUNT).
+    count_values = {}
 
     enums = bindings["enums"]
     for enum in enums:
@@ -36,6 +54,11 @@ def process_enums(bindings):
         for element in enum["elements"]:
             is_internal = element["is_internal"]
             is_count = element["is_count"]
+
+            if is_count:
+                # Record ALL count constants (including internal ones) so that
+                # struct array-bound resolution works (e.g. ImGuiKey_NamedKey_COUNT).
+                count_values[element["name"]] = element["value"]
 
             if is_internal or is_count:
                 continue
@@ -82,7 +105,7 @@ def process_enums(bindings):
             lines.append(f'_{name}["{element_name}"] = Napi::Number::New(env, {element_value});')
 
         lines.append(f'freeze.Call({{_{name}}});')
-        lines.append(f'enums["{name}"] = _{name};')
+        lines.append(f'exports["{name}"] = _{name};')
         lines.append("")
 
     enum_cpp = ENUMS_CPP_FORMAT.replace("{enums}", "\n  ".join(lines).strip())
@@ -103,7 +126,10 @@ def process_enums(bindings):
     cpp_file = GEN_NAPI / "enums.cpp"
     cpp_file.write_text(enum_cpp)
 
+    hdr_file = GEN_NAPI / "enums_init.h"
+    hdr_file.write_text(ENUMS_INIT_H)
+
     dts_file = GEN_DTS / "enums.d.ts"
     dts_file.write_text(enum_dts)
 
-    return enum_names
+    return enum_names, count_values

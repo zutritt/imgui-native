@@ -21,9 +21,9 @@ IntRef::IntRef(const Napi::CallbackInfo& info)
   }
 }
 
-inline int32_t IntRef::Value() { return this->value; }
+int32_t IntRef::Value() { return this->value; }
 
-inline int32_t* IntRef::Ptr() { return &this->value; }
+int32_t* IntRef::Ptr() { return &this->value; }
 
 Napi::Value IntRef::GetValue(const Napi::CallbackInfo& info) {
   return Napi::Number::New(info.Env(), this->value);

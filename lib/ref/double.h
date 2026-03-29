@@ -7,8 +7,8 @@ class DoubleRef : public Napi::ObjectWrap<DoubleRef> {
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
   DoubleRef(const Napi::CallbackInfo& info);
 
-  inline double Value();
-  inline double* Ptr();
+  double Value();
+  double* Ptr();
 
  private:
   double value;

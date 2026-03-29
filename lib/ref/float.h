@@ -7,8 +7,8 @@ class FloatRef : public Napi::ObjectWrap<FloatRef> {
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
   FloatRef(const Napi::CallbackInfo& info);
 
-  inline float Value();
-  inline float* Ptr();
+  float Value();
+  float* Ptr();
 
  private:
   float value;

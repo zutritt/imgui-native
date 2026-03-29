@@ -7,8 +7,8 @@ class StringRef : public Napi::ObjectWrap<StringRef> {
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
   StringRef(const Napi::CallbackInfo& info);
 
-  inline char* Data();
-  inline size_t Capacity();
+  char* Data();
+  size_t Capacity();
 
  private:
   std::string value;

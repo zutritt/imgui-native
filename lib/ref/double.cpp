@@ -21,9 +21,9 @@ DoubleRef::DoubleRef(const Napi::CallbackInfo& info)
   }
 }
 
-inline double DoubleRef::Value() { return this->value; }
+double DoubleRef::Value() { return this->value; }
 
-inline double* DoubleRef::Ptr() { return &this->value; }
+double* DoubleRef::Ptr() { return &this->value; }
 
 Napi::Value DoubleRef::GetValue(const Napi::CallbackInfo& info) {
   return Napi::Number::New(info.Env(), this->value);

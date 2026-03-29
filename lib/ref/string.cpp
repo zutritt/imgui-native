@@ -22,9 +22,9 @@ StringRef::StringRef(const Napi::CallbackInfo& info)
   }
 }
 
-inline char* StringRef::Data() { return this->value.data(); }
+char* StringRef::Data() { return this->value.data(); }
 
-inline size_t StringRef::Capacity() { return this->value.capacity(); }
+size_t StringRef::Capacity() { return this->value.capacity(); }
 
 Napi::Value StringRef::GetValue(const Napi::CallbackInfo& info) {
   return Napi::String::New(info.Env(), this->value);

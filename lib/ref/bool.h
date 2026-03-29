@@ -7,8 +7,8 @@ class BoolRef : public Napi::ObjectWrap<BoolRef> {
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
   BoolRef(const Napi::CallbackInfo& info);
 
-  inline bool Value();
-  inline bool* Ptr();
+  bool Value();
+  bool* Ptr();
 
  private:
   bool value;

@@ -18,7 +18,3 @@ CallbackRef::CallbackRef(const Napi::CallbackInfo& info)
     this->callback = Napi::Persistent(info[0].As<Napi::Function>());
   }
 }
-
-inline const Napi::FunctionReference& CallbackRef::GetCallback() const {
-  return this->callback;
-}

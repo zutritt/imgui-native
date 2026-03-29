@@ -8,6 +8,9 @@ from config import GEN_DTS
 from config import GEN_NAPI
 from processor.enum import process_enums
 from processor.typedef import process_typedefs
+from processor.struct import process_structs
+from processor.func import process_functions
+from processor.backend import process_backends
 
 
 def clean_dir(path: Path):
@@ -37,8 +40,13 @@ def main():
 
     print("File loaded, generating bindings")
 
-    processed_enums = process_enums(bindings)
-    _processed_typedefs = process_typedefs(bindings, processed_enums)
+    processed_enums, count_values = process_enums(bindings)
+    processed_typedefs = process_typedefs(bindings, processed_enums)
+    processed_structs = process_structs(bindings, processed_enums, processed_typedefs, count_values)
+    process_functions(bindings, processed_enums, processed_typedefs, processed_structs)
+
+    print("Generating backend wrappers")
+    process_backends()
 
     print("All done")
 

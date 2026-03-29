@@ -7,8 +7,8 @@ class IntRef : public Napi::ObjectWrap<IntRef> {
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
   IntRef(const Napi::CallbackInfo& info);
 
-  inline int32_t Value();
-  inline int32_t* Ptr();
+  int32_t Value();
+  int32_t* Ptr();
 
  private:
   int32_t value;

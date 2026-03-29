@@ -4,12 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "cmake-js build"
+    "build": "cmake-js build",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "node-addon-api": "^8.6.0",
-    "cmake-js": "^8.0.0"
+    "cmake-js": "^8.0.0",
+    "node-addon-api": "^8.6.0"
   },
   "peerDependencies": {
     "typescript": "^5"

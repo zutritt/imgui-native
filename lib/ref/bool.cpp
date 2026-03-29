@@ -21,9 +21,9 @@ BoolRef::BoolRef(const Napi::CallbackInfo& info)
   }
 }
 
-inline bool BoolRef::Value() { return this->value; }
+bool BoolRef::Value() { return this->value; }
 
-inline bool* BoolRef::Ptr() { return &this->value; }
+bool* BoolRef::Ptr() { return &this->value; }
 
 Napi::Value BoolRef::GetValue(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(info.Env(), this->value);

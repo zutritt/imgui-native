@@ -21,9 +21,9 @@ FloatRef::FloatRef(const Napi::CallbackInfo& info)
   }
 }
 
-inline float FloatRef::Value() { return this->value; }
+float FloatRef::Value() { return this->value; }
 
-inline float* FloatRef::Ptr() { return &this->value; }
+float* FloatRef::Ptr() { return &this->value; }
 
 Napi::Value FloatRef::GetValue(const Napi::CallbackInfo& info) {
   return Napi::Number::New(info.Env(), this->value);
