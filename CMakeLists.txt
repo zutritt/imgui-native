@@ -275,6 +275,10 @@ file(GLOB_RECURSE SOURCE_FILES
   "lib/gen/backend_napi/*.cpp" "lib/gen/backend_napi/*.h"
 )
 
+# Generated C backend wrappers under lib/gen/backends are compiled only via
+# BACKEND_SOURCES when the corresponding backend is enabled.
+list(FILTER SOURCE_FILES EXCLUDE REGEX "lib/gen/backends/.*\\.cpp$")
+
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${BACKEND_SOURCES} ${CMAKE_JS_SRC})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
