@@ -515,7 +515,7 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
     Vec2* _max = Vec2::Unwrap(info[1].As<Napi::Object>());
     CallbackRef* _cb = (info.Length() > 2 && !info[2].IsNull() && !info[2].IsUndefined())
         ? CallbackRef::Unwrap(info[2].As<Napi::Object>()) : nullptr;
-    auto _custom_cb = [](ImGuiSizeCallbackData* data) {
+    ImGuiSizeCallback _custom_cb = [](ImGuiSizeCallbackData* data) {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = SizeCallbackData::NewInstance(ref->Env(), data);
@@ -534,7 +534,7 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
         ? static_cast<ImGuiInputTextFlags>(info[2].As<Napi::Number>().Int32Value()) : 0;
     CallbackRef* _cb = (info.Length() > 3 && !info[3].IsNull() && !info[3].IsUndefined())
         ? CallbackRef::Unwrap(info[3].As<Napi::Object>()) : nullptr;
-    auto _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
+    ImGuiInputTextCallback _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
@@ -562,7 +562,7 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
         ? static_cast<ImGuiInputTextFlags>(info[3].As<Napi::Number>().Int32Value()) : 0;
     CallbackRef* _cb = (info.Length() > 4 && !info[4].IsNull() && !info[4].IsUndefined())
         ? CallbackRef::Unwrap(info[4].As<Napi::Object>()) : nullptr;
-    auto _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
+    ImGuiInputTextCallback _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
@@ -586,7 +586,7 @@ static void _InitSyntheticFuncs(Napi::Env env, Napi::Object exports) {
         ? static_cast<ImGuiInputTextFlags>(info[3].As<Napi::Number>().Int32Value()) : 0;
     CallbackRef* _cb = (info.Length() > 4 && !info[4].IsNull() && !info[4].IsUndefined())
         ? CallbackRef::Unwrap(info[4].As<Napi::Object>()) : nullptr;
-    auto _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
+    ImGuiInputTextCallback _input_cb = [](ImGuiInputTextCallbackData* data) -> int {
       CallbackRef* ref = static_cast<CallbackRef*>(data->UserData);
       Napi::HandleScope scope(ref->Env());
       Napi::Object wrapper = InputTextCallbackData::NewInstance(ref->Env(), data);
