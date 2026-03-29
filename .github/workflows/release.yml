@@ -99,12 +99,44 @@ jobs:
           mkdir -p "prebuild/${{ matrix.platform }}-${{ matrix.arch }}"
           cp "build/Release/imgui.node" "prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node"
 
-      - name: Upload prebuild artifact
+      - name: Upload prebuild artifact (attempt 1)
+        id: upload_prebuild_1
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
           path: prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node
           if-no-files-found: error
+          overwrite: true
+
+      - name: Upload prebuild artifact (attempt 2)
+        id: upload_prebuild_2
+        if: steps.upload_prebuild_1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
+          path: prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Upload prebuild artifact (attempt 3)
+        id: upload_prebuild_3
+        if: steps.upload_prebuild_1.outcome == 'failure' && steps.upload_prebuild_2.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
+          path: prebuild/${{ matrix.platform }}-${{ matrix.arch }}/imgui.node
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Ensure prebuild artifact upload succeeded
+        if: steps.upload_prebuild_1.outcome == 'failure' && steps.upload_prebuild_2.outcome == 'failure' && steps.upload_prebuild_3.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Prebuild artifact upload failed after 3 attempts"
+          exit 1
 
   pack:
     name: Assemble package
@@ -193,12 +225,44 @@ jobs:
           tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/dts/ref.d.ts$'
           tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/gen/dts/funcs.d.ts$'
 
-      - name: Upload package artifact
+      - name: Upload package artifact (attempt 1)
+        id: upload_package_1
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: package-tarball
           path: ${{ steps.pack.outputs.tarball }}
           if-no-files-found: error
+          overwrite: true
+
+      - name: Upload package artifact (attempt 2)
+        id: upload_package_2
+        if: steps.upload_package_1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-tarball
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Upload package artifact (attempt 3)
+        id: upload_package_3
+        if: steps.upload_package_1.outcome == 'failure' && steps.upload_package_2.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-tarball
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Ensure package artifact upload succeeded
+        if: steps.upload_package_1.outcome == 'failure' && steps.upload_package_2.outcome == 'failure' && steps.upload_package_3.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Package artifact upload failed after 3 attempts"
+          exit 1
 
   publish:
     name: Publish package
