@@ -131,6 +131,7 @@ jobs:
       - name: Generate declaration files
         shell: bash
         run: |
+          mkdir -p lib/gen/bindings
           python deps/dear_bindings/dear_bindings.py -o lib/gen/bindings/dcimgui deps/imgui/imgui.h
           python gen/main.py
 
