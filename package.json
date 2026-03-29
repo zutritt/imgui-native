@@ -26,7 +26,7 @@
     "build": "cmake-js build",
     "test": "bun test tests",
     "typecheck": "bunx tsc --noEmit",
-    "prepack": "npm run generate"
+    "prepack": "cmake-js configure"
   },
   "license": "MIT",
   "publishConfig": {
