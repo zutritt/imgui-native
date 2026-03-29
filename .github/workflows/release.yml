@@ -34,7 +34,7 @@ jobs:
           - os: windows-latest
             platform: win32
             arch: x64
-          - os: macos-13
+          - os: macos-14
             platform: darwin
             arch: x64
           - os: macos-14
@@ -70,7 +70,7 @@ jobs:
           python gen/main.py
 
       - name: Build native addon
-        run: npm run build
+        run: npm run build -- --arch=${{ matrix.arch }}
 
       - name: Collect prebuild binary
         shell: bash
