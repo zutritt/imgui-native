@@ -7,7 +7,7 @@ This package ships prebuilt `.node` binaries for major desktop targets and TypeS
 ## Install
 
 ```bash
-npm install imgui-native
+bun install imgui-native
 ```
 
 ## Usage
