@@ -124,12 +124,12 @@ def process_enums(bindings):
     enum_dts = "\n".join(lines)
 
     cpp_file = GEN_NAPI / "enums.cpp"
-    cpp_file.write_text(enum_cpp)
+    cpp_file.write_text(enum_cpp, encoding="utf-8")
 
     hdr_file = GEN_NAPI / "enums_init.h"
-    hdr_file.write_text(ENUMS_INIT_H)
+    hdr_file.write_text(ENUMS_INIT_H, encoding="utf-8")
 
     dts_file = GEN_DTS / "enums.d.ts"
-    dts_file.write_text(enum_dts)
+    dts_file.write_text(enum_dts, encoding="utf-8")
 
     return enum_names, count_values

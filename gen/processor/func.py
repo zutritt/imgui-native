@@ -695,8 +695,8 @@ def process_functions(
     hdr_path  = GEN_NAPI / "funcs_init.h"
     dts_path  = GEN_DTS  / "funcs.d.ts"
 
-    cpp_path.write_text(_build_cpp(func_infos))
-    hdr_path.write_text(_build_init_header())
+    cpp_path.write_text(_build_cpp(func_infos), encoding="utf-8")
+    hdr_path.write_text(_build_init_header(), encoding="utf-8")
     struct_type_names = {
       s["cpp_class_name"]
       for s in processed_structs.values()
@@ -717,7 +717,8 @@ def process_functions(
 
     dts_path.write_text(
       _build_dts(func_infos, struct_type_names, enum_type_names, typedef_type_names)
-      + _SYNTHETIC_TEXT_DTS
+      + _SYNTHETIC_TEXT_DTS,
+      encoding="utf-8",
     )
 
     print(f"  [func] Wrote funcs.cpp, funcs_init.h, funcs.d.ts")

@@ -560,7 +560,7 @@ def _run_dear_bindings(header: str, out_stem: Path) -> Path | None:
         txt = txt.replace("struct _SDL_GameController**", "_SDL_GameController**")
         txt = txt.replace("struct cimgui::_SDL_GameController**", "cimgui::_SDL_GameController**")
         txt = txt.replace("struct ::_SDL_GameController**", "::_SDL_GameController**")
-        p.write_text(txt)
+        p.write_text(txt, encoding="utf-8")
 
     return out_stem.with_suffix(".json")
 
@@ -606,8 +606,8 @@ def process_backends() -> None:
         h_path = GEN_BACKEND_NAPI_DIR / f"{key}_backend.h"
         cpp_path = GEN_BACKEND_NAPI_DIR / f"{key}_backend.cpp"
 
-        h_path.write_text(header_src)
-        cpp_path.write_text(cpp_src)
+        h_path.write_text(header_src, encoding="utf-8")
+        cpp_path.write_text(cpp_src, encoding="utf-8")
 
         bound_count = cpp_src.count("static Napi::Value") // 2  # real + stub
         print(f"    bound: {bound_count} functions")
@@ -618,8 +618,8 @@ def process_backends() -> None:
     # 4. Write backends_init.h/.cpp
     if init_info:
         init_h, init_cpp = _build_backends_init(init_info)
-        (GEN_BACKEND_NAPI_DIR / "backends_init.h").write_text(init_h)
-        (GEN_BACKEND_NAPI_DIR / "backends_init.cpp").write_text(init_cpp)
+        (GEN_BACKEND_NAPI_DIR / "backends_init.h").write_text(init_h, encoding="utf-8")
+        (GEN_BACKEND_NAPI_DIR / "backends_init.cpp").write_text(init_cpp, encoding="utf-8")
 
     # 5. Write combined backends.d.ts
     dts_path = ROOT_DIR / "lib" / "gen" / "dts" / "backends.d.ts"
@@ -636,7 +636,8 @@ def process_backends() -> None:
         '// Auto-generated — do not edit.\n'
         'import type { DrawData, TextureData } from "./structs";\n\n'
         + "\n".join(all_dts)
-        + glfw_alias_dts
+        + glfw_alias_dts,
+        encoding="utf-8",
     )
 
     print(f"  [backend] Generated {len(init_info)} backend namespace(s)")

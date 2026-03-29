@@ -298,6 +298,6 @@ def process_typedefs(bindings, processed_enums):
     enum_dts = "\n".join(prelude + lines) + "\n"
 
     dts_file = GEN_DTS / "typedefs.d.ts"
-    dts_file.write_text(enum_dts)
+    dts_file.write_text(enum_dts, encoding="utf-8")
 
     return type_declarations

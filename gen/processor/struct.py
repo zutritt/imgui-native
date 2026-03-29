@@ -1466,8 +1466,8 @@ def process_structs(
 
         header_path = GEN_NAPI / f"{file_base}.h"
         cpp_path = GEN_NAPI / f"{file_base}.cpp"
-        header_path.write_text(_build_header(class_name, c_struct_name, resolved_fields, is_by_ref, struct_methods))
-        cpp_path.write_text(_build_cpp(class_name, c_struct_name, file_base, resolved_fields, is_by_ref, struct_methods))
+        header_path.write_text(_build_header(class_name, c_struct_name, resolved_fields, is_by_ref, struct_methods), encoding="utf-8")
+        cpp_path.write_text(_build_cpp(class_name, c_struct_name, file_base, resolved_fields, is_by_ref, struct_methods), encoding="utf-8")
 
     # Write combined TypeScript declarations.
     dts_path = GEN_DTS / "structs.d.ts"
@@ -1483,13 +1483,13 @@ def process_structs(
         for enum_name in processed_enums.values()
         if enum_name
     }
-    dts_path.write_text(_build_dts(all_struct_infos, enum_type_names, typedef_type_names))
+    dts_path.write_text(_build_dts(all_struct_infos, enum_type_names, typedef_type_names), encoding="utf-8")
 
     # Write the init shim that module.cpp calls to register all wrappers.
     class_names = [info["cpp_class_name"] for info in all_struct_infos]
     file_bases = [info["file_base"] for info in all_struct_infos]
 
-    (GEN_NAPI / "structs_init.h").write_text(_build_init_header(class_names))
-    (GEN_NAPI / "structs_init.cpp").write_text(_build_init_cpp(class_names, file_bases))
+    (GEN_NAPI / "structs_init.h").write_text(_build_init_header(class_names), encoding="utf-8")
+    (GEN_NAPI / "structs_init.cpp").write_text(_build_init_cpp(class_names, file_bases), encoding="utf-8")
 
     return processed_structs
