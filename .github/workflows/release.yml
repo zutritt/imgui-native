@@ -154,6 +154,17 @@ jobs:
           test -f prebuild/darwin-x64/imgui.node
           test -f prebuild/darwin-arm64/imgui.node
 
+      - name: Verify declaration payload
+        shell: bash
+        run: |
+          test -f lib/types.d.ts
+          test -f lib/dts/ref.d.ts
+          test -f lib/gen/dts/backends.d.ts
+          test -f lib/gen/dts/enums.d.ts
+          test -f lib/gen/dts/funcs.d.ts
+          test -f lib/gen/dts/structs.d.ts
+          test -f lib/gen/dts/typedefs.d.ts
+
       - name: Verify package contents
         shell: bash
         run: bun pm pack --dry-run --ignore-scripts
@@ -162,9 +173,18 @@ jobs:
         id: pack
         shell: bash
         run: |
-          TARBALL="$(bun pm pack --quiet --ignore-scripts | tail -n 1 | tr -d '\r')"
-          test -n "$TARBALL"
+          mkdir -p dist
+          bun pm pack --ignore-scripts --filename dist/package.tgz > /dev/null
+          TARBALL="dist/package.tgz"
+          test -f "$TARBALL"
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tarball declarations
+        shell: bash
+        run: |
+          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/types.d.ts$'
+          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/dts/ref.d.ts$'
+          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/gen/dts/funcs.d.ts$'
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
