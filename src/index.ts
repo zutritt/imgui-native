@@ -4,17 +4,23 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import type * as LibTypes from '../lib/types';
 
-const _require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url);
 
-function getBinaryPath(): string {
+function getBinaryPath() {
   const localBuild = join(import.meta.dirname, '..', 'build', 'Release', 'imgui.node');
-  if (existsSync(localBuild)) return localBuild;
+
+  if (existsSync(localBuild)) {
+    return localBuild;
+  }
 
   const prebuild = join(import.meta.dirname, '..', 'prebuild', `${platform}-${arch}`, 'imgui.node');
-  if (existsSync(prebuild)) return prebuild;
+
+  if (existsSync(prebuild)) {
+    return prebuild;
+  }
 
   throw new Error(`No prebuild binary found for platform ${platform}-${arch}, and no local build found.`);
 }
 
-const addon = _require(getBinaryPath()) as unknown as typeof LibTypes;
+const addon = require(getBinaryPath()) as unknown as typeof LibTypes;
 export default addon;
