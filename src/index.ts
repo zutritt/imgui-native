@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { platform, arch } from 'node:process';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import type * as LibTypes from '../lib/types';
+import type ImGuiNative from '../lib/types';
 
 const require = createRequire(import.meta.url);
 
@@ -22,5 +22,5 @@ function getBinaryPath() {
   throw new Error(`No prebuild binary found for platform ${platform}-${arch}, and no local build found.`);
 }
 
-const addon = require(getBinaryPath()) as unknown as typeof LibTypes;
+const addon = require(getBinaryPath()) as unknown as typeof ImGuiNative;
 export default addon;
