@@ -221,9 +221,10 @@ jobs:
       - name: Verify tarball declarations
         shell: bash
         run: |
-          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/types.d.ts$'
-          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/dts/ref.d.ts$'
-          tar -tzf "${{ steps.pack.outputs.tarball }}" | grep -q '^package/lib/gen/dts/funcs.d.ts$'
+          tar -tzf "${{ steps.pack.outputs.tarball }}" > /tmp/package-contents.txt
+          grep -Fxq 'package/lib/types.d.ts' /tmp/package-contents.txt
+          grep -Fxq 'package/lib/dts/ref.d.ts' /tmp/package-contents.txt
+          grep -Fxq 'package/lib/gen/dts/funcs.d.ts' /tmp/package-contents.txt
 
       - name: Upload package artifact (attempt 1)
         id: upload_package_1
