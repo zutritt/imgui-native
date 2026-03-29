@@ -582,7 +582,7 @@ def process_backends() -> None:
         header = backend["header"]
         js_name = backend["js_name"]
 
-        print(f"  [backend] {key} → {js_name}")
+        print(f"  [backend] {key} -> {js_name}")
 
         # 1. Run dear_bindings
         out_stem = GEN_BACKENDS_DIR / f"dcimgui_impl_{key}"

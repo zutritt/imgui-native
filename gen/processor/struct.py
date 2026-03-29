@@ -931,7 +931,7 @@ def _build_header(
             seen_suffixes.add(suffix)
     method_suffixes_after = [f.get("method_suffix", "?") for f in deduplicated_fields]
     if method_suffixes_before != method_suffixes_after:
-        print(f"  [dedup] {class_name}: {len(method_suffixes_before)} → {len(method_suffixes_after)} fields")
+        print(f"  [dedup] {class_name}: {len(method_suffixes_before)} -> {len(method_suffixes_after)} fields")
     resolved_fields = deduplicated_fields
 
     # Collect additional headers required by nested struct-type fields.
@@ -1400,7 +1400,7 @@ def process_structs(
         c_struct_name = original_name
         field_ref = "this->ptr->" if is_by_ref else "this->value."
 
-        print(f"  {'[ref]' if is_by_ref else '[val]'} {original_name} → {class_name} ({file_base}.h/.cpp)")
+        print(f"  {'[ref]' if is_by_ref else '[val]'} {original_name} -> {class_name} ({file_base}.h/.cpp)")
 
         resolved_fields = []
         for field in struct["fields"]:
