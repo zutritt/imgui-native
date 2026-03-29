@@ -40,6 +40,7 @@ jobs:
 
       - name: Generate bindings
         run: |
+          python -c "from pathlib import Path; Path('lib/gen/bindings').mkdir(parents=True, exist_ok=True)"
           python deps/dear_bindings/dear_bindings.py -o lib/gen/bindings/dcimgui deps/imgui/imgui.h
           python gen/main.py
 
